@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ebustl-utils"  # PyPI name (with hyphen)
+version = "0.1.0"
+description = "EBU STL subtitle extraction utilities"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "teletext-decoder @ git+https://github.com/ZXGuesser/teletext-decoder.git",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/ebustl-utils"
+Repository = "https://github.com/yourusername/ebustl-utils"
+
+[tool.setuptools.packages.find]
+include = ["ebustl_utils*"]  # Module name (with underscore)
