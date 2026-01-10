@@ -5,7 +5,7 @@ import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
-from ebustl_utils.stl_helpers import convert_teletext_to_stl
+from ebustl_utils.helpers import convert_teletext_to_stl
 
 
 @dataclass

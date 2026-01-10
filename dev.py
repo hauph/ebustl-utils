@@ -69,9 +69,10 @@ def read_stl():
             with open(stl_path, "rb") as f:
                 raw_data = f.read()
                 reader = STLReader()
-                result = reader.read(raw_data)
+                reader.read(raw_data)
+                captions = reader.captions
                 print(f"File: {stl_file}")
-                print(json.dumps(result, indent=4))
+                print(json.dumps(captions, indent=4))
                 print(f"{'=' * 60}")
         except Exception as e:
             print(f"\n✗ Error reading {stl_file}: {e}")

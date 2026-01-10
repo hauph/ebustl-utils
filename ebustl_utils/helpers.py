@@ -1,215 +1,44 @@
 """
-EBU STL Converter - Converts Teletext/OP-47 data from MXF to EBU STL format.
+EBU STL Helpers
 
-This module extracts ALL teletext features including:
-- Colors (foreground/background)
-- Layout (positioning, justification)
-- Formatting (italic, underline, boxing, double height)
-- Character set mappings
+For STLExtractor - Converts Teletext/OP-47 data from MXF to EBU STL format:
+    This module extracts ALL teletext features including:
+    - Colors (foreground/background)
+    - Layout (positioning, justification)
+    - Formatting (italic, underline, boxing, double height)
+    - Character set mappings
 
-Uses decode_teletext_line function from teletext-decoder library for teletext parsing.
+    Uses decode_teletext_line function from teletext-decoder library for teletext parsing.
+
+For STLReader - Reads .stl file and provides STL caption data structures with formatting:
+    This module provides STL caption data structures with formatting.
+    - Colors (text color/background color)
+    - Layout (vertical position, justification)
+    - Formatting (italic, bold, underline, double height, flash)
+    - Font (font weight, font style)
 """
 
 import struct
-from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import List, Dict
 from datetime import datetime
+from typing import List, Dict, Optional, Any
+import re
 
 from teletextdecoder.decoder import decode_teletext_line
 
-
-# =============================================================================
-# Teletext Color Codes
-# =============================================================================
-
-
-class TeletextColor(IntEnum):
-    """Teletext Level 1 colors (spacing attributes 0x00-0x07)"""
-
-    BLACK = 0
-    RED = 1
-    GREEN = 2
-    YELLOW = 3
-    BLUE = 4
-    MAGENTA = 5
-    CYAN = 6
-    WHITE = 7
-
-
-# Map teletext color codes to EBU STL color names
-TELETEXT_COLOR_NAMES = {
-    TeletextColor.BLACK: "black",
-    TeletextColor.RED: "red",
-    TeletextColor.GREEN: "green",
-    TeletextColor.YELLOW: "yellow",
-    TeletextColor.BLUE: "blue",
-    TeletextColor.MAGENTA: "magenta",
-    TeletextColor.CYAN: "cyan",
-    TeletextColor.WHITE: "white",
-}
+from .models import (
+    TeletextColor,
+    TeletextControlCode,
+    EBUSTLControlCode,
+    JustificationCode,
+    TextSegment,
+    SubtitleLine,
+    Subtitle,
+    TELETEXT_COLOR_NAMES,
+)
 
 
 # =============================================================================
-# Teletext Control Codes
-# =============================================================================
-
-
-class TeletextControlCode(IntEnum):
-    """Teletext control codes (0x00-0x1F)"""
-
-    # Alpha colors (foreground)
-    ALPHA_BLACK = 0x00
-    ALPHA_RED = 0x01
-    ALPHA_GREEN = 0x02
-    ALPHA_YELLOW = 0x03
-    ALPHA_BLUE = 0x04
-    ALPHA_MAGENTA = 0x05
-    ALPHA_CYAN = 0x06
-    ALPHA_WHITE = 0x07
-
-    # Display control
-    FLASH = 0x08
-    STEADY = 0x09
-    END_BOX = 0x0A
-    START_BOX = 0x0B
-    NORMAL_HEIGHT = 0x0C
-    DOUBLE_HEIGHT = 0x0D
-    DOUBLE_WIDTH = 0x0E
-    DOUBLE_SIZE = 0x0F
-
-    # Mosaic colors
-    MOSAIC_BLACK = 0x10
-    MOSAIC_RED = 0x11
-    MOSAIC_GREEN = 0x12
-    MOSAIC_YELLOW = 0x13
-    MOSAIC_BLUE = 0x14
-    MOSAIC_MAGENTA = 0x15
-    MOSAIC_CYAN = 0x16
-    MOSAIC_WHITE = 0x17
-
-    # Additional control
-    CONCEAL = 0x18
-    CONTIGUOUS_MOSAIC = 0x19
-    SEPARATED_MOSAIC = 0x1A
-    ESC = 0x1B
-    BLACK_BACKGROUND = 0x1C
-    NEW_BACKGROUND = 0x1D
-    HOLD_MOSAIC = 0x1E
-    RELEASE_MOSAIC = 0x1F
-
-
-# =============================================================================
-# EBU STL Control Codes (for Text Field)
-# =============================================================================
-
-
-class EBUSTLControlCode(IntEnum):
-    """EBU STL Text Field control codes"""
-
-    # Teletext spacing attributes (0x00-0x07 foreground colors)
-    ALPHA_BLACK = 0x00
-    ALPHA_RED = 0x01
-    ALPHA_GREEN = 0x02
-    ALPHA_YELLOW = 0x03
-    ALPHA_BLUE = 0x04
-    ALPHA_MAGENTA = 0x05
-    ALPHA_CYAN = 0x06
-    ALPHA_WHITE = 0x07
-
-    # Display attributes
-    FLASH = 0x08
-    STEADY = 0x09
-    END_BOX = 0x0A
-    START_BOX = 0x0B
-    NORMAL_HEIGHT = 0x0C
-    DOUBLE_HEIGHT = 0x0D
-
-    # Formatting
-    ITALIC_ON = 0x80
-    ITALIC_OFF = 0x81
-    UNDERLINE_ON = 0x82
-    UNDERLINE_OFF = 0x83
-    BOXING_ON = 0x84
-    BOXING_OFF = 0x85
-
-    # Line break
-    NEWLINE = 0x8A
-
-    # Unused space (filler)
-    UNUSED_SPACE = 0x8F
-
-
-# =============================================================================
-# Justification Codes
-# =============================================================================
-
-
-class JustificationCode(IntEnum):
-    """EBU STL Justification codes"""
-
-    UNCHANGED = 0x00
-    LEFT = 0x01
-    CENTERED = 0x02
-    RIGHT = 0x03
-
-
-# =============================================================================
-# Subtitle Data Structures with Full Formatting
-# =============================================================================
-
-
-@dataclass
-class TextSegment:
-    """A segment of text with formatting attributes."""
-
-    text: str
-    foreground_color: TeletextColor = TeletextColor.WHITE
-    background_color: TeletextColor = TeletextColor.BLACK
-    double_height: bool = False
-    flash: bool = False
-    boxing: bool = False
-    concealed: bool = False
-
-
-@dataclass
-class SubtitleLine:
-    """A single line of subtitle text with full formatting."""
-
-    row: int  # Vertical position (1-24 for teletext)
-    segments: List[TextSegment] = field(default_factory=list)
-    double_height: bool = False
-
-    @property
-    def text(self) -> str:
-        """Get plain text without formatting."""
-        return "".join(seg.text for seg in self.segments)
-
-    @property
-    def has_content(self) -> bool:
-        """Check if line has actual content."""
-        return bool(self.text.strip())
-
-
-@dataclass
-class Subtitle:
-    """A complete subtitle with timing, positioning, and formatted content."""
-
-    index: int
-    start_time: int  # In frames (25fps for PAL)
-    end_time: int  # In frames
-    lines: List[SubtitleLine] = field(default_factory=list)
-    justification: JustificationCode = JustificationCode.CENTERED
-    vertical_position: int = 20  # Default near bottom
-
-    @property
-    def has_content(self) -> bool:
-        """Check if subtitle has actual content."""
-        return any(line.has_content for line in self.lines)
-
-
-# =============================================================================
-# Enhanced Teletext Parser
+# Teletext Extraction Functions
 # =============================================================================
 
 
@@ -255,6 +84,11 @@ def extract_teletext_from_vanc(raw_data: bytes) -> List[tuple]:
         offset = pos + 3 + 42  # Move past this packet
 
     return packets
+
+
+# =============================================================================
+# Enhanced Teletext Parser
+# =============================================================================
 
 
 class TeletextParser:
@@ -353,7 +187,7 @@ class TeletextParser:
 
     def _process_packet(self, packet: bytes) -> None:
         """Process a teletext packet and extract formatting."""
-        # Use decoder.py for basic packet decoding
+        # Use teletextdecoder for basic packet decoding
         decoded = decode_teletext_line(packet)
 
         if not decoded or len(decoded) < 2:
@@ -363,11 +197,11 @@ class TeletextParser:
         packet_num = decoded[1]
 
         if packet_num == 0 and len(decoded) >= 5:
-            self._process_header(packet, decoded, magazine)
+            self._process_header(decoded, magazine)
         elif 1 <= packet_num <= 25:
             self._process_row(packet, decoded, magazine, packet_num)
 
-    def _process_header(self, packet: bytes, decoded: list, magazine: int) -> None:
+    def _process_header(self, decoded: list, magazine: int) -> None:
         """Process page header packet."""
         page = decoded[2]
         control = decoded[4]
@@ -411,8 +245,6 @@ class TeletextParser:
         The decoder returns text with control codes as ⟦XX⟧ sequences.
         We need to extract the actual text and formatting.
         """
-        import re
-
         line = SubtitleLine(row=row)
 
         # Extract formatting from control codes in the text
@@ -518,9 +350,6 @@ class TeletextParser:
                 elif byte >= 0x10 and byte <= 0x17:
                     # Mosaic color (treat as foreground for subtitles)
                     fg_color = TeletextColor(byte - 0x10)
-
-                # Control codes are NOT added to text (they're formatting only)
-
             elif byte == 0x20:
                 # Space character - add to current text
                 current_text += " "
@@ -986,3 +815,132 @@ def _format_tc(frames: int, fps: int = 25) -> str:
     m = (total_seconds % 3600) // 60
     s = total_seconds % 60
     return f"{h:02d}:{m:02d}:{s:02d}:{f:02d}"
+
+
+# =============================================================================
+# STL Text Decoding Functions
+# =============================================================================
+
+
+def format_timecode_from_seconds(seconds: float, fps: float) -> str:
+    """
+    Format seconds into HH:MM:SS;FF using the given frame‑rate.
+    """
+    if seconds < 0:
+        seconds = 0.0
+
+    total_frames = int(round(seconds * fps))
+    s, f = divmod(total_frames, int(fps))
+    h, rem = divmod(s, 3600)
+    m, s = divmod(rem, 60)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d};{int(f):02d}"
+
+
+def decode_ebu_stl_text(text_raw: bytes) -> Dict[str, Any]:
+    """
+    Decode the 112‑byte text field from a TTI block.
+
+    Returns a dict with:
+        - text: decoded text string
+        - color: foreground color (or None if white/default)
+        - background_color: background color from boxing (or None)
+        - italic: bool
+        - bold: bool
+        - underline: bool
+        - flash: bool
+        - double_height: bool
+    """
+    text_chars: List[str] = []
+    italic = False
+    bold = False
+    underline = False
+    flash = False
+    double_height = False
+    current_color = "white"
+    background_color: Optional[str] = None
+
+    for byte in text_raw:
+        # Unused space filler
+        if byte == EBUSTLControlCode.UNUSED_SPACE:
+            continue
+        # Foreground colors (0x00-0x07)
+        if EBUSTLControlCode.ALPHA_BLACK <= byte <= EBUSTLControlCode.ALPHA_WHITE:
+            current_color = TELETEXT_COLOR_NAMES.get(byte, current_color)
+            continue
+        # Flash ON
+        if byte == EBUSTLControlCode.FLASH:
+            flash = True
+            continue
+        # Flash OFF (steady)
+        if byte == EBUSTLControlCode.STEADY:
+            flash = False
+            continue
+        # End box - no action needed, boxing state tracked via background_color
+        if byte == EBUSTLControlCode.END_BOX:
+            continue
+        # Start box - creates background
+        if byte == EBUSTLControlCode.START_BOX:
+            # Boxing typically uses black background
+            if background_color is None:
+                background_color = "black"
+            continue
+        # Normal height
+        if byte == EBUSTLControlCode.NORMAL_HEIGHT:
+            double_height = False
+            continue
+        # Double height
+        if byte == EBUSTLControlCode.DOUBLE_HEIGHT:
+            double_height = True
+            continue
+        # Italic ON
+        if byte == EBUSTLControlCode.ITALIC_ON:
+            italic = True
+            continue
+        # Italic OFF
+        if byte == EBUSTLControlCode.ITALIC_OFF:
+            italic = False
+            continue
+        # Underline ON
+        if byte == EBUSTLControlCode.UNDERLINE_ON:
+            underline = True
+            continue
+        # Underline OFF
+        if byte == EBUSTLControlCode.UNDERLINE_OFF:
+            underline = False
+            continue
+        # Boxing ON (some implementations use for bold)
+        if byte == EBUSTLControlCode.BOXING_ON:
+            bold = True
+            continue
+        # Boxing OFF
+        if byte == EBUSTLControlCode.BOXING_OFF:
+            bold = False
+            continue
+        # New line
+        if byte == EBUSTLControlCode.NEWLINE:
+            # Collapse consecutive newlines to match subtitle rendering behavior
+            if not text_chars or text_chars[-1] != "\n":
+                text_chars.append("\n")
+            continue
+
+        # Printable range – EBU STL uses ISO 6937 or Latin‑1; we
+        # approximate with ISO‑8859‑1, which is fine for QC‑style tools.
+        if 32 <= byte < 127:
+            text_chars.append(chr(byte))
+        elif 128 <= byte <= 255:
+            try:
+                text_chars.append(bytes([byte]).decode("latin-1"))
+            except (UnicodeDecodeError, ValueError):
+                # Best‑effort: skip unknown bytes
+                continue
+
+    return {
+        "text": "".join(text_chars),
+        "color": current_color if current_color != "white" else None,
+        "background_color": background_color,
+        "italic": italic,
+        "bold": bold,
+        "underline": underline,
+        "flash": flash,
+        "double_height": double_height,
+    }
