@@ -8,7 +8,9 @@ from ebustl_utils.helpers import format_timecode_from_seconds, decode_ebu_stl_te
 # ------------------------------------------------------------------ #
 # TTI parsing
 # ------------------------------------------------------------------ #
-def parse_tti_blocks(buffer: io.BytesIO, fps: float) -> List[STLCaption]:
+def parse_tti_blocks(
+    buffer: io.BytesIO, fps: float, cct: str = "00"
+) -> List[STLCaption]:
     """
     Parse all 128‑byte TTI blocks from the given buffer.
 
@@ -96,7 +98,7 @@ def parse_tti_blocks(buffer: io.BytesIO, fps: float) -> List[STLCaption]:
 
         text_raw = tti[16:128]
 
-        decoded = decode_ebu_stl_text(text_raw)
+        decoded = decode_ebu_stl_text(text_raw, cct)
         text = decoded["text"]
 
         start_seconds = tci_h * 3600 + tci_m * 60 + tci_s + tci_f / fps

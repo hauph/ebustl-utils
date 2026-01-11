@@ -274,3 +274,114 @@ class STLCaption:
             "style": style,
             "layout": layout,
         }
+
+
+# EBU Tech 3264 Language Code mapping (hex code -> ISO 639-1)
+EBU_LANGUAGE_CODES: Dict[int, str] = {
+    0x00: "",  # Unknown/not specified
+    0x01: "sq",  # Albanian
+    0x02: "br",  # Breton
+    0x03: "ca",  # Catalan
+    0x04: "hr",  # Croatian
+    0x05: "cy",  # Welsh
+    0x06: "cs",  # Czech
+    0x07: "da",  # Danish
+    0x08: "de",  # German
+    0x09: "en",  # English
+    0x0A: "es",  # Spanish
+    0x0B: "eo",  # Esperanto
+    0x0C: "et",  # Estonian
+    0x0D: "eu",  # Basque
+    0x0E: "fo",  # Faroese
+    0x0F: "fr",  # French
+    0x10: "fy",  # Frisian
+    0x11: "ga",  # Irish
+    0x12: "gd",  # Gaelic (Scottish)
+    0x13: "gl",  # Galician
+    0x14: "is",  # Icelandic
+    0x15: "it",  # Italian
+    0x16: "lb",  # Luxembourgish
+    0x17: "lt",  # Lithuanian
+    0x18: "lv",  # Latvian
+    0x19: "mk",  # Macedonian
+    0x1A: "mt",  # Maltese
+    0x1B: "nl",  # Dutch
+    0x1C: "no",  # Norwegian
+    0x1D: "oc",  # Occitan
+    0x1E: "pl",  # Polish
+    0x1F: "pt",  # Portuguese
+    0x20: "ro",  # Romanian
+    0x21: "rm",  # Romansh
+    0x22: "sr",  # Serbian
+    0x23: "sk",  # Slovak
+    0x24: "sl",  # Slovenian
+    0x25: "fi",  # Finnish
+    0x26: "sv",  # Swedish
+    0x27: "tr",  # Turkish
+    0x28: "nl-BE",  # Flemish
+    0x29: "wa",  # Walloon
+    # Extended codes (0x7F+)
+    0x7F: "am",  # Amharic
+    0x80: "ar",  # Arabic
+    0x81: "hy",  # Armenian
+    0x82: "as",  # Assamese
+    0x83: "az",  # Azerbaijani
+    0x84: "bm",  # Bambara
+    0x85: "be",  # Belarusian
+    0x86: "bn",  # Bengali
+    0x87: "bg",  # Bulgarian
+    0x88: "my",  # Burmese
+    0x89: "zh",  # Chinese
+    0x8A: "cpe",  # Creole (generic)
+    0x8B: "ka",  # Georgian
+    0x8C: "el",  # Greek
+    0x8D: "gu",  # Gujarati
+    0x8E: "gn",  # Guarani
+    0x8F: "ha",  # Hausa
+    0x90: "he",  # Hebrew
+    0x91: "hi",  # Hindi
+    0x92: "id",  # Indonesian
+    0x93: "ja",  # Japanese
+    0x94: "kn",  # Kannada
+    0x95: "kk",  # Kazakh
+    0x96: "km",  # Khmer
+    0x97: "ko",  # Korean
+    0x98: "lo",  # Lao
+    0x99: "la",  # Latin
+    0x9A: "ms",  # Malay
+    0x9B: "ml",  # Malayalam
+    0x9C: "mr",  # Marathi
+    0x9D: "mo",  # Moldavian
+    0x9E: "ne",  # Nepali
+    0x9F: "or",  # Oriya
+    0xA0: "pap",  # Papiamento
+    0xA1: "fa",  # Persian
+    0xA2: "pa",  # Punjabi
+    0xA3: "ps",  # Pushto
+    0xA4: "qu",  # Quechua
+    0xA5: "ru",  # Russian
+    0xA6: "sm",  # Samoan
+    0xA7: "sn",  # Shona
+    0xA8: "si",  # Sinhalese
+    0xA9: "so",  # Somali
+    0xAA: "sw",  # Swahili
+    0xAB: "tl",  # Tagalog
+    0xAC: "ta",  # Tamil
+    0xAD: "te",  # Telugu
+    0xAE: "th",  # Thai
+    0xAF: "uk",  # Ukrainian
+    0xB0: "ur",  # Urdu
+    0xB1: "uz",  # Uzbek
+    0xB2: "vi",  # Vietnamese
+    0xB3: "zu",  # Zulu
+}
+
+
+# CCT (Character Code Table) to Python codec mapping
+CCT_CODECS: Dict[str, str] = {
+    "00": "latin-1",  # Latin (ISO 6937 approximated as Latin-1)
+    "01": "iso8859-5",  # Latin/Cyrillic
+    "02": "iso8859-6",  # Latin/Arabic
+    "03": "iso8859-7",  # Latin/Greek
+    "04": "iso8859-8",  # Latin/Hebrew
+}

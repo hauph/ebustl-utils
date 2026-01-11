@@ -25,7 +25,8 @@ def decode_stl_file(raw: bytes, fps_override: Optional[float]) -> Dict[str, Any]
         fps = fps_override
 
     # TTI blocks (remaining 128‑byte records)
-    captions = parse_tti_blocks(buffer, fps)
+    cct = gsi_info.get("character_code_table", "00")
+    captions = parse_tti_blocks(buffer, fps, cct)
 
     return {
         "captions": [c.to_dict() for c in captions],

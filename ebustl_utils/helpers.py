@@ -34,6 +34,7 @@ from .models import (
     SubtitleLine,
     Subtitle,
     TELETEXT_COLOR_NAMES,
+    CCT_CODECS,
 )
 
 
@@ -836,9 +837,13 @@ def format_timecode_from_seconds(seconds: float, fps: float) -> str:
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d};{int(f):02d}"
 
 
-def decode_ebu_stl_text(text_raw: bytes) -> Dict[str, Any]:
+def decode_ebu_stl_text(text_raw: bytes, cct: str = "00") -> Dict[str, Any]:
     """
     Decode the 112‑byte text field from a TTI block.
+
+    Args:
+        text_raw: Raw 112-byte text field from TTI block
+        cct: Character Code Table from GSI (00=Latin, 01=Cyrillic, etc.)
 
     Returns a dict with:
         - text: decoded text string
@@ -850,6 +855,7 @@ def decode_ebu_stl_text(text_raw: bytes) -> Dict[str, Any]:
         - flash: bool
         - double_height: bool
     """
+    codec = CCT_CODECS.get(cct, "latin-1")
     text_chars: List[str] = []
     italic = False
     bold = False
@@ -923,13 +929,12 @@ def decode_ebu_stl_text(text_raw: bytes) -> Dict[str, Any]:
                 text_chars.append("\n")
             continue
 
-        # Printable range – EBU STL uses ISO 6937 or Latin‑1; we
-        # approximate with ISO‑8859‑1, which is fine for QC‑style tools.
+        # Printable range – decode using the appropriate character set based on CCT
         if 32 <= byte < 127:
             text_chars.append(chr(byte))
         elif 128 <= byte <= 255:
             try:
-                text_chars.append(bytes([byte]).decode("latin-1"))
+                text_chars.append(bytes([byte]).decode(codec))
             except (UnicodeDecodeError, ValueError):
                 # Best‑effort: skip unknown bytes
                 continue

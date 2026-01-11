@@ -72,11 +72,6 @@ class STLReader:
         """Frame rate (read-only)."""
         return self._fps
 
-    # @property
-    # def drop_frame(self):
-    #     """Drop frame flag (read-only)."""
-    #     return self._drop_frame
-
     @property
     def language(self):
         """Language (read-only)."""
@@ -100,6 +95,9 @@ class STLReader:
         self._result = result
         self._captions = result["captions"]
         self._gsi = result["gsi"]
+
+        language = result["gsi"].get("language")
+        self._language = language if language else self._language
 
         fps = result["fps"]
         self._fps = fps if fps != self._fps else self._fps
