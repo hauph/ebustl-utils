@@ -202,6 +202,21 @@ class Subtitle:
 
 
 # =============================================================================
+# Simple Data Structure for Video Info
+# =============================================================================
+
+
+@dataclass
+class VideoInfo:
+    """Video timing information from MXF."""
+
+    duration_seconds: float
+    frame_rate: float
+    total_frames: int
+    start_timecode: str  # e.g. "00:00:00:00"
+
+
+# =============================================================================
 # STL Caption Data Structures with Formatting
 # =============================================================================
 

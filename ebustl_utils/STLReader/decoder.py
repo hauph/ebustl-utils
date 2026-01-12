@@ -15,6 +15,15 @@ def decode_stl_file(raw: bytes, fps_override: Optional[float]) -> Dict[str, Any]
     if len(raw) < 1024:
         raise ValueError(f"STL file too short to contain GSI header: {len(raw)} bytes")
 
+    # Validate EBU-STL format by checking Disk Format Code (DFC) at bytes 3-11
+    # Valid DFC starts with "STL" (e.g., "STL25.01", "STL30.01", "STL24.01")
+    dfc = raw[3:11].decode("ascii", errors="ignore").strip().upper()
+    if not dfc.startswith("STL"):
+        raise ValueError(
+            f"Invalid EBU-STL file: Disk Format Code '{dfc}' does not start with 'STL'. "
+            "This file does not appear to be a valid EBU-STL subtitle file."
+        )
+
     buffer = io.BytesIO(raw)
 
     # GSI block (first 1024 bytes)

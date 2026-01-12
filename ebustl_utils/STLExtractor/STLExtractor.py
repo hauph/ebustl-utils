@@ -2,20 +2,10 @@ import json
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass
 from typing import Optional
 
 from ebustl_utils.helpers import convert_teletext_to_stl
-
-
-@dataclass
-class VideoInfo:
-    """Video timing information from MXF."""
-
-    duration_seconds: float
-    frame_rate: float
-    total_frames: int
-    start_timecode: str  # e.g. "00:00:00:00"
+from ebustl_utils.models import VideoInfo
 
 
 class STLExtractor:
@@ -32,6 +22,9 @@ class STLExtractor:
     ):
         if mxf_path is None:
             raise ValueError("MXF path is required")
+        elif not mxf_path.endswith(".mxf"):
+            raise ValueError("MXF path must end with .mxf")
+
         if output_path is None:
             raise ValueError("Output path is required")
 
