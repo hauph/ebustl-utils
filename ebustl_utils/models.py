@@ -222,6 +222,46 @@ class VideoInfo:
 
 
 @dataclass
+class STLStyledSegment:
+    """A segment of text with inline styling for STL captions.
+
+    Used to represent text with multiple styles within a single caption,
+    e.g., "blue green" where "blue" is colored blue and "green" is colored green.
+    """
+
+    text: str
+    color: Optional[str] = None
+    background_color: Optional[str] = None
+    italic: bool = False
+    bold: bool = False
+    underline: bool = False
+    flash: bool = False
+    double_height: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        result: Dict[str, Any] = {"text": self.text}
+        style: Dict[str, Any] = {}
+        if self.color:
+            style["color"] = self.color
+        if self.background_color:
+            style["background-color"] = self.background_color
+        if self.italic:
+            style["font-style"] = "italic"
+        if self.bold:
+            style["font-weight"] = "bold"
+        if self.underline:
+            style["text-decoration"] = "underline"
+        if self.flash:
+            style["visibility"] = "flash"
+        if self.double_height:
+            style["line-height"] = "double"
+        if style:
+            result["style"] = style
+        return result
+
+
+@dataclass
 class STLCaption:
     """A single subtitle caption with formatting and layout."""
 
@@ -230,7 +270,7 @@ class STLCaption:
     text: str
     start_timecode: str
     end_timecode: str
-    # Style attributes (CCS-like styling)
+    # Style attributes (CCS-like styling) - used when no inline segments
     color: Optional[str] = None
     background_color: Optional[str] = None
     italic: bool = False
@@ -241,35 +281,41 @@ class STLCaption:
     # Layout attributes
     vertical_position: Optional[int] = None  # Row 0-23
     justification: Optional[str] = None  # left, center, right
+    # Styled segments for inline styling (e.g., multi-color text)
+    segments: Optional[List["STLStyledSegment"]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        # Build style dict only if there are styling attributes
+        # Check if we have inline styled segments with multiple styles
+        has_inline_styles = self.segments and len(self.segments) > 1
+
+        # Build style dict only if there are styling attributes (for single-style captions)
         style: Optional[Dict[str, Any]] = None
-        has_style = (
-            self.color
-            or self.background_color
-            or self.italic
-            or self.bold
-            or self.underline
-            or self.flash
-            or self.double_height
-        )
-        if has_style:
-            style = {}
-            if self.color:
-                style["color"] = self.color
-            if self.background_color:
-                style["background-color"] = self.background_color
-            if self.italic:
-                style["font-style"] = "italic"
-            if self.bold:
-                style["font-weight"] = "bold"
-            if self.underline:
-                style["text-decoration"] = "underline"
-            if self.flash:
-                style["visibility"] = "flash"
-            if self.double_height:
-                style["line-height"] = "double"
+        if not has_inline_styles:
+            has_style = (
+                self.color
+                or self.background_color
+                or self.italic
+                or self.bold
+                or self.underline
+                or self.flash
+                or self.double_height
+            )
+            if has_style:
+                style = {}
+                if self.color:
+                    style["color"] = self.color
+                if self.background_color:
+                    style["background-color"] = self.background_color
+                if self.italic:
+                    style["font-style"] = "italic"
+                if self.bold:
+                    style["font-weight"] = "bold"
+                if self.underline:
+                    style["text-decoration"] = "underline"
+                if self.flash:
+                    style["visibility"] = "flash"
+                if self.double_height:
+                    style["line-height"] = "double"
 
         # Build layout dict only if there are positioning attributes
         layout: Optional[Dict[str, Any]] = None
@@ -280,7 +326,7 @@ class STLCaption:
             if self.justification:
                 layout["text_align"] = self.justification
 
-        return {
+        result = {
             "start": self.start,
             "start_timecode": self.start_timecode,
             "end": self.end,
@@ -289,6 +335,12 @@ class STLCaption:
             "style": style,
             "layout": layout,
         }
+
+        # Include segments when there are inline styles
+        if has_inline_styles:
+            result["segments"] = [seg.to_dict() for seg in self.segments]
+
+        return result
 
 
 # EBU Tech 3264 Language Code mapping (hex code -> ISO 639-1)

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ebustl-utils"  # PyPI name (with hyphen)
 version = "0.1.0"
-description = "EBU STL subtitle extraction utilities"
+description = "EBU STL subtitle utilities: Extract teletext subtitles from MXF video files and read/parse EBU STL subtitle files with formatting support."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -19,8 +19,15 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Video :: Conversion",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Text Processing",
+    "Topic :: Text Processing :: General",  
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-keywords = ["captions", "closed-captions", "subtitles", "ebu-stl", "teletext", "op-47", "vanc", "vbi", "vbi-teletext", "mxf", "stl-reader", "stl-extractor"]
+keywords = ["captions", "closed-captions", "subtitles", "ebu-stl", "teletext", "op-47", "vanc", "vbi", "vbi-teletext", "mxf", "stl-reader", "stl-extractor", "stl"]
 dependencies = [
     "teletext-decoder @ git+https://github.com/ZXGuesser/teletext-decoder.git",
 ]
@@ -31,8 +38,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/ebustl-utils"
-Repository = "https://github.com/yourusername/ebustl-utils"
+Homepage = "https://github.com/hauph/ebustl-utils"
+Repository = "https://github.com/hauph/ebustl-utils"
+Issues = "https://github.com/hauph/ebustl-utils/issues"
 
 [tool.setuptools.packages.find]
 include = ["ebustl_utils*"]  # Module name (with underscore)

@@ -1,5 +1,5 @@
 import io
-from ebustl_utils.STLReader.parsers.tti_blocks_parser import parse_tti_blocks
+from ebustl_utils.STLReader.parsers.tti_parser import parse_tti_blocks
 from helpers_for_testing import make_tti_block
 
 

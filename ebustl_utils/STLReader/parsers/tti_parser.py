@@ -1,12 +1,12 @@
 import io
 from typing import List, Dict, Any, Optional
 import struct
-from ebustl_utils.models import JustificationCode, STLCaption
+from ebustl_utils.models import JustificationCode, STLCaption, STLStyledSegment
 from ebustl_utils.helpers import format_timecode_from_seconds, decode_ebu_stl_text
 
 
 # ------------------------------------------------------------------ #
-# TTI parsing
+# Text and Timing Information (TTI) parsing
 # ------------------------------------------------------------------ #
 def parse_tti_blocks(
     buffer: io.BytesIO, fps: float, cct: str = "00"
@@ -37,6 +37,9 @@ def parse_tti_blocks(
         start_tc = format_timecode_from_seconds(start_seconds, fps)
         end_tc = format_timecode_from_seconds(end_seconds, fps)
 
+        # Get accumulated segments
+        segments: List[STLStyledSegment] = entry.get("segments", [])
+
         captions.append(
             STLCaption(
                 start=start_us,
@@ -53,6 +56,7 @@ def parse_tti_blocks(
                 double_height=entry.get("double_height", False),
                 vertical_position=entry.get("vertical_position"),
                 justification=entry.get("justification"),
+                segments=segments if segments else None,
             )
         )
 
@@ -118,6 +122,7 @@ def parse_tti_blocks(
         if entry is None:
             entry = {
                 "text_chunks": [],
+                "segments": [],
                 "color": decoded["color"],
                 "background_color": decoded["background_color"],
                 "italic": decoded["italic"],
@@ -150,6 +155,11 @@ def parse_tti_blocks(
 
         if text:
             entry["text_chunks"].append(text)
+
+        # Accumulate styled segments
+        segments = decoded.get("segments", [])
+        if segments:
+            entry["segments"].extend(segments)
 
         # Flush entry for single or last block
         if cs in (0x00, 0x03):

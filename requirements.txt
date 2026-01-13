@@ -1,1 +1,0 @@
-teletext-decoder @ git+https://github.com/ZXGuesser/teletext-decoder.git

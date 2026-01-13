@@ -42,6 +42,7 @@ def make_gsi_block(
 
 def make_tti_block(
     sn: int = 1,
+    ebn: int = 0xFF,  # Extension Block Number (0xFF = single/last block)
     cs: int = 0x00,  # Single block
     tci: tuple = (0, 0, 1, 0),  # 00:00:01:00
     tco: tuple = (0, 0, 3, 0),  # 00:00:03:00
@@ -60,7 +61,7 @@ def make_tti_block(
     tti[2] = sn & 0xFF
 
     # Extension Block Number (byte 3)
-    tti[3] = 0xFF  # Standard block
+    tti[3] = ebn
 
     # Cumulative Status (byte 4)
     tti[4] = cs

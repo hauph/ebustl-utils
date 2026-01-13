@@ -1,5 +1,8 @@
+import warnings
+
 import pytest
 from ebustl_utils.STLReader.decoder import decode_stl_file
+from ebustl_utils.STLReader.STLValidationWarning import STLValidationWarning
 
 from helpers_for_testing import make_gsi_block, make_stl_file, make_tti_block
 
@@ -238,3 +241,124 @@ class TestDecodeStlFileReturnStructure:
         # Should be dict, not STLCaption object
         assert isinstance(result["captions"][0], dict)
         assert "text" in result["captions"][0]
+
+
+# =============================================================================
+# Tests for decode_stl_file - Validation Warnings
+# =============================================================================
+
+
+class TestDecodeStlFileValidationWarnings:
+    """Tests for EBN/CS validation warnings (Adobe Premiere compatibility)."""
+
+    def test_no_warning_for_valid_single_blocks(self):
+        """EBN=255 with CS=0 should not trigger warning (standard single block)."""
+        tti = make_tti_block(sn=1, ebn=0xFF, cs=0, text=b"Test")
+        stl_data = make_stl_file(tti_blocks=[tti])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            # No STLValidationWarning should be raised
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 0
+
+    def test_no_warning_for_ebn_zero_with_cs_zero(self):
+        """EBN=0 with CS=0 should not trigger warning (tolerated by Adobe)."""
+        # EBN=0 is first block of extension, but CS=0 is tolerated
+        tti1 = make_tti_block(sn=1, ebn=0, cs=0, text=b"First")
+        tti2 = make_tti_block(sn=1, ebn=0xFF, cs=0, text=b"Last")
+        stl_data = make_stl_file(tti_blocks=[tti1, tti2])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 0
+
+    def test_warning_for_intermediate_ebn_with_cs_zero(self):
+        """EBN=1,2,3... (intermediate) with CS=0 should trigger warning."""
+        # This is invalid according to EBU spec and rejected by Adobe Premiere
+        tti1 = make_tti_block(sn=1, ebn=0, cs=0, text=b"First")
+        tti2 = make_tti_block(sn=1, ebn=1, cs=0, text=b"Intermediate")  # Invalid!
+        tti3 = make_tti_block(sn=1, ebn=0xFF, cs=0, text=b"Last")
+        stl_data = make_stl_file(tti_blocks=[tti1, tti2, tti3])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 1
+            assert "intermediate EBN" in str(stl_warnings[0].message)
+
+    def test_warning_for_multiple_intermediate_ebn_blocks(self):
+        """Multiple intermediate EBN blocks with CS=0 should all be counted."""
+        # Simulating basic_test.stl pattern that fails in Adobe
+        tti_blocks = [
+            make_tti_block(sn=1, ebn=0, cs=0, text=b"Block 0"),
+            make_tti_block(sn=1, ebn=1, cs=0, text=b"Block 1"),  # Invalid
+            make_tti_block(sn=1, ebn=2, cs=0, text=b"Block 2"),  # Invalid
+            make_tti_block(sn=1, ebn=3, cs=0, text=b"Block 3"),  # Invalid
+            make_tti_block(sn=1, ebn=0xFF, cs=0, text=b"Block last"),
+        ]
+        stl_data = make_stl_file(tti_blocks=tti_blocks)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 1
+            # Should report 3 blocks (EBN=1,2,3)
+            assert "3 of first" in str(stl_warnings[0].message)
+
+    def test_warning_only_checks_first_10_blocks(self):
+        """Validation should only check first 10 TTI blocks."""
+        # Create 15 blocks, with invalid blocks only at positions 11-14
+        valid_blocks = [
+            make_tti_block(sn=i, ebn=0xFF, cs=0, text=f"Valid {i}".encode())
+            for i in range(10)
+        ]
+        # These invalid blocks are after the first 10, should not trigger warning
+        invalid_blocks = [
+            make_tti_block(sn=10 + i, ebn=1, cs=0, text=f"Invalid {i}".encode())
+            for i in range(5)
+        ]
+        stl_data = make_stl_file(tti_blocks=valid_blocks + invalid_blocks)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 0
+
+    def test_valid_multi_block_extension_no_warning(self):
+        """Valid multi-block extension with proper CS values should not warn."""
+        # Proper multi-block: EBN=0 CS=1 (first), EBN=255 CS=3 (last)
+        # Note: Our validation currently only checks EBN with CS=0, so this should pass
+        tti1 = make_tti_block(sn=1, ebn=0, cs=1, text=b"First")
+        tti2 = make_tti_block(sn=1, ebn=0xFF, cs=3, text=b"Last")
+        stl_data = make_stl_file(tti_blocks=[tti1, tti2])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            decode_stl_file(stl_data, fps_override=None)
+
+            stl_warnings = [
+                x for x in w if issubclass(x.category, STLValidationWarning)
+            ]
+            assert len(stl_warnings) == 0

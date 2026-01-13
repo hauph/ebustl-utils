@@ -17,8 +17,8 @@ RUN curl https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.t
 WORKDIR /app
 
 # Copy and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
 
 # copy the rest of the application
 COPY ebustl_utils /app/ebustl_utils

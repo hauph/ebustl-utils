@@ -9,7 +9,6 @@ This will convert the sample MXF files to STL format.
 
 import sys
 import os
-import json
 
 # Add the project root to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
@@ -37,19 +36,16 @@ def extract_stl():
             print(f"File not found: {mxf_path}")
             continue
 
-        # Output STL file with same name
-        stl_file = os.path.splitext(mxf_file)[0] + ".stl"
-        stl_path = os.path.join(output_dir, stl_file)
-
         print(f"\n{'=' * 60}")
         print(f"Processing: {mxf_file}")
-        print(f"Output: {stl_path}")
         print(f"{'=' * 60}")
 
         try:
             # Convert MXF to STL (extracts ALL teletext pages)
-            extractor = STLExtractor(mxf_path, stl_path)
+            # STL file is automatically named after the MXF file
+            extractor = STLExtractor(mxf_path, output_dir)
             extractor.extract()
+            print(f"Output: {extractor.output_path}")
         except Exception as e:
             print(f"\n✗ Error processing {mxf_file}: {e}")
 
@@ -69,10 +65,12 @@ def read_stl():
             with open(stl_path, "rb") as f:
                 raw_data = f.read()
                 reader = STLReader()
-                reader.read(raw_data)
-                captions = reader.captions
                 print(f"File: {stl_file}")
-                print(json.dumps(captions, indent=4))
+                reader.read(raw_data)
+                print(f"Captions: {reader.captions}")
+                # print(f"GSI: {reader.gsi}")
+                # print(f"Language: {reader.language}")
+                # print(f"FPS: {reader.fps}")
                 print(f"{'=' * 60}")
         except Exception as e:
             print(f"\n✗ Error reading {stl_file}: {e}")

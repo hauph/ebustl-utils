@@ -33,6 +33,7 @@ from .models import (
     TextSegment,
     SubtitleLine,
     Subtitle,
+    STLStyledSegment,
     TELETEXT_COLOR_NAMES,
     CCT_CODECS,
 )
@@ -854,9 +855,11 @@ def decode_ebu_stl_text(text_raw: bytes, cct: str = "00") -> Dict[str, Any]:
         - underline: bool
         - flash: bool
         - double_height: bool
+        - segments: list of STLStyledSegment for inline styled text
     """
     codec = CCT_CODECS.get(cct, "latin-1")
-    text_chars: List[str] = []
+
+    # Current style state
     italic = False
     bold = False
     underline = False
@@ -865,21 +868,51 @@ def decode_ebu_stl_text(text_raw: bytes, cct: str = "00") -> Dict[str, Any]:
     current_color = "white"
     background_color: Optional[str] = None
 
+    # Track styled segments for inline styling
+    segments: List[STLStyledSegment] = []
+    current_segment_text: List[str] = []
+
+    def flush_segment():
+        """Flush current text to a segment with current style."""
+        nonlocal current_segment_text
+        text = "".join(current_segment_text)
+        if text:
+            segments.append(
+                STLStyledSegment(
+                    text=text,
+                    color=current_color if current_color != "white" else None,
+                    background_color=background_color,
+                    italic=italic,
+                    bold=bold,
+                    underline=underline,
+                    flash=flash,
+                    double_height=double_height,
+                )
+            )
+        current_segment_text = []
+
     for byte in text_raw:
         # Unused space filler
         if byte == EBUSTLControlCode.UNUSED_SPACE:
             continue
         # Foreground colors (0x00-0x07)
         if EBUSTLControlCode.ALPHA_BLACK <= byte <= EBUSTLControlCode.ALPHA_WHITE:
-            current_color = TELETEXT_COLOR_NAMES.get(byte, current_color)
+            new_color = TELETEXT_COLOR_NAMES.get(byte, current_color)
+            if new_color != current_color:
+                flush_segment()
+                current_color = new_color
             continue
         # Flash ON
         if byte == EBUSTLControlCode.FLASH:
-            flash = True
+            if not flash:
+                flush_segment()
+                flash = True
             continue
         # Flash OFF (steady)
         if byte == EBUSTLControlCode.STEADY:
-            flash = False
+            if flash:
+                flush_segment()
+                flash = False
             continue
         # End box - no action needed, boxing state tracked via background_color
         if byte == EBUSTLControlCode.END_BOX:
@@ -888,64 +921,110 @@ def decode_ebu_stl_text(text_raw: bytes, cct: str = "00") -> Dict[str, Any]:
         if byte == EBUSTLControlCode.START_BOX:
             # Boxing typically uses black background
             if background_color is None:
+                flush_segment()
                 background_color = "black"
             continue
         # Normal height
         if byte == EBUSTLControlCode.NORMAL_HEIGHT:
-            double_height = False
+            if double_height:
+                flush_segment()
+                double_height = False
             continue
         # Double height
         if byte == EBUSTLControlCode.DOUBLE_HEIGHT:
-            double_height = True
+            if not double_height:
+                flush_segment()
+                double_height = True
             continue
         # Italic ON
         if byte == EBUSTLControlCode.ITALIC_ON:
-            italic = True
+            if not italic:
+                flush_segment()
+                italic = True
             continue
         # Italic OFF
         if byte == EBUSTLControlCode.ITALIC_OFF:
-            italic = False
+            if italic:
+                flush_segment()
+                italic = False
             continue
         # Underline ON
         if byte == EBUSTLControlCode.UNDERLINE_ON:
-            underline = True
+            if not underline:
+                flush_segment()
+                underline = True
             continue
         # Underline OFF
         if byte == EBUSTLControlCode.UNDERLINE_OFF:
-            underline = False
+            if underline:
+                flush_segment()
+                underline = False
             continue
         # Boxing ON (some implementations use for bold)
         if byte == EBUSTLControlCode.BOXING_ON:
-            bold = True
+            if not bold:
+                flush_segment()
+                bold = True
             continue
         # Boxing OFF
         if byte == EBUSTLControlCode.BOXING_OFF:
-            bold = False
+            if bold:
+                flush_segment()
+                bold = False
             continue
         # New line
         if byte == EBUSTLControlCode.NEWLINE:
             # Collapse consecutive newlines to match subtitle rendering behavior
-            if not text_chars or text_chars[-1] != "\n":
-                text_chars.append("\n")
+            # Check if last character in current segment or last segment ends with newline
+            last_char_is_newline = (
+                current_segment_text and current_segment_text[-1] == "\n"
+            ) or (
+                not current_segment_text
+                and segments
+                and segments[-1].text.endswith("\n")
+            )
+            if not last_char_is_newline:
+                current_segment_text.append("\n")
+                # Flush segment and reset color to white on newline
+                # This matches Adobe Premiere behavior where each line starts with default color
+                flush_segment()
+                current_color = "white"
             continue
 
         # Printable range – decode using the appropriate character set based on CCT
         if 32 <= byte < 127:
-            text_chars.append(chr(byte))
+            current_segment_text.append(chr(byte))
         elif 128 <= byte <= 255:
             try:
-                text_chars.append(bytes([byte]).decode(codec))
+                current_segment_text.append(bytes([byte]).decode(codec))
             except (UnicodeDecodeError, ValueError):
                 # Best‑effort: skip unknown bytes
                 continue
 
+    # Flush any remaining text
+    flush_segment()
+
+    # Build full text from segments
+    full_text = "".join(seg.text for seg in segments)
+
+    # Determine the "primary" style (last segment's style or most common)
+    # For backwards compatibility, we return the last active style
+    final_color = segments[-1].color if segments else None
+    final_bg = segments[-1].background_color if segments else None
+    final_italic = segments[-1].italic if segments else False
+    final_bold = segments[-1].bold if segments else False
+    final_underline = segments[-1].underline if segments else False
+    final_flash = segments[-1].flash if segments else False
+    final_double_height = segments[-1].double_height if segments else False
+
     return {
-        "text": "".join(text_chars),
-        "color": current_color if current_color != "white" else None,
-        "background_color": background_color,
-        "italic": italic,
-        "bold": bold,
-        "underline": underline,
-        "flash": flash,
-        "double_height": double_height,
+        "text": full_text,
+        "color": final_color,
+        "background_color": final_bg,
+        "italic": final_italic,
+        "bold": final_bold,
+        "underline": final_underline,
+        "flash": final_flash,
+        "double_height": final_double_height,
+        "segments": segments,
     }

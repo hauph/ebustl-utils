@@ -14,22 +14,31 @@ class STLExtractor:
 
     Args:
         mxf_path: Path to the MXF file (required)
-        output_path: Path to the output STL file (required)
+        output_dir: Directory to save the output STL file (required).
+                    The STL filename is derived from the MXF filename.
     """
 
     def __init__(
-        self, mxf_path: Optional[str] = None, output_path: Optional[str] = None
+        self, mxf_path: Optional[str] = None, output_dir: Optional[str] = None
     ):
         if mxf_path is None:
             raise ValueError("MXF path is required")
         elif not mxf_path.endswith(".mxf"):
             raise ValueError("MXF path must end with .mxf")
 
-        if output_path is None:
-            raise ValueError("Output path is required")
+        if output_dir is None:
+            raise ValueError("Output directory is required")
+
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Derive STL filename from MXF filename
+        mxf_basename = os.path.basename(mxf_path)
+        stl_filename = os.path.splitext(mxf_basename)[0] + ".stl"
 
         self.mxf_path = mxf_path
-        self.output_path = output_path
+        self.output_dir = output_dir
+        self.output_path = os.path.join(output_dir, stl_filename)
         self._video_info = self._get_mxf_video_info()
         self._raw_data = self._extract_raw_payload_from_mxf()
 
