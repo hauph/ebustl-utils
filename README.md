@@ -1,10 +1,19 @@
 # ebustl-utils
 
-A Python library for working with EBU STL (European Broadcasting Union Subtitling) files. Extract teletext subtitles from MXF video files and read/parse EBU STL subtitle files with formatting support.
+A Python library for working with EBU STL (European Broadcasting Union Subtitling) files, specifically the `Tech 3264-E` specification. Extract teletext subtitles from MXF video files and read/parse EBU STL subtitle files with formatting support.
+
+## Preface
+
+Once, I worked on a project that required me to extract teletext subtitles from MXF video files and parse them into EBU STL format. Also, I needed to parse the EBU STL file and get the caption data with timing and formatting. I found that there were no libraries that could do this (maybe I just didn't look hard enough), so I decided to create my own.
+
+In this library, there are two main classes: `STLExtractor` and `STLReader`.
+
+- `STLExtractor` is used to extract teletext subtitles from MXF video files (.mxf) and convert them to EBU STL format. It depends on `ffmpeg` and `ffprobe` to extract the teletext subtitles from the MXF video file. The tricky part is to decode the teletext packets; and fortunately, there is a library that supports this called [teletext-decoder](https://github.com/ZXGuesser/teletext-decoder) that I used in this library.
+- `STLReader` is used to read and parse EBU STL (.stl) binary files into structured caption data. The caption data structure is inspired by [Pycaption library](https://github.com/pbs/pycaption), though there are some differences. Besides, I tried to follow the EBU Tech 3264-E specification as much as possible + I used Adobe Premiere as a reference for the caption data such as styling, layout information and validation warnings/errors.
 
 ## Features
 
-- **STLExtractor** — Extract teletext/OP-47 subtitles from MXF video files and convert to EBU STL format.
+- **STLExtractor** — Extract teletext/OP-47 subtitles from MXF video files (.mxf) and convert to EBU STL format.
 - **STLReader** — Read and parse EBU STL (.stl) binary files into structured caption data.
 - Support EBU Tech 3264-E specification.
 - Preserves formatting: colors, italic, bold, underline, double-height, flash.
@@ -162,7 +171,7 @@ When a caption contains multiple inline styles (e.g., different colors for diffe
 }
 ```
 
-- The `segments` field is only present when there are **multiple inline styles** within a caption.
+- The `segments` field is only present when there are **multiple different inline styles** within a caption.
 - Each segment contains its own `text` and optional `style` dictionary.
 - For single-style captions, use the top-level `style` field (segments will be absent).
 - **Color resets on newlines** — Following Teletext conventions and Adobe Premiere behavior, foreground color resets to white at the start of each new line.
@@ -203,7 +212,7 @@ STLReader uses lenient parsing — it reads TTI blocks until EOF and tolerates m
 
 When structural issues are detected (such as invalid EBN/CS field combinations in TTI blocks), a `STLValidationWarning` is emitted:
 
-``` python
+``` text
 STLValidationWarning: STL file validation issues: 3 of first 9 TTI block(s) have 
 intermediate EBN (1-254) with invalid CS=0. This file may fail in strict parsers 
 like Adobe Premiere. Parsed 9 captions successfully.
@@ -227,6 +236,7 @@ import warnings
 from ebustl_utils.STLReader import STLReader, STLValidationWarning
 
 warnings.filterwarnings('error', category=STLValidationWarning)
+reader = STLReader()
 reader.read(data)  # Raises STLValidationWarning exception on mismatch
 ```
 
@@ -261,5 +271,11 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- [EBU Tech 3264-E](https://tech.ebu.ch/docs/tech/tech3264.pdf) — EBU Subtitling Data Exchange Format specification
-- [teletext-decoder](https://github.com/ZXGuesser/teletext-decoder) — Teletext packet decoding
+- [EBU Tech 3264-E](https://tech.ebu.ch/docs/tech/tech3264.pdf) — EBU Subtitling Data Exchange Format specification.
+- [teletext-decoder](https://github.com/ZXGuesser/teletext-decoder) — Teletext packet decoding.
+- [stltools](https://github.com/blutorange/stltools) — Ebu Stl Subtitle Writer, written in Ruby.
+- [pycaption](https://github.com/pbs/pycaption) — Python module to read/write popular video caption formats.
+
+## Postface
+
+I am not an expert in Closed Captioning, specifically EBU STL, so this library is not perfect and may not be the best way to work with EBU STL files. Therefore, I would appreciate any suggestions and improvements. If you find any issues or have any suggestions, please feel free to open an issue or submit a pull request. Thank you!

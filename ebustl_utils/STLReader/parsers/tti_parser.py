@@ -2,7 +2,7 @@ import io
 from typing import List, Dict, Any, Optional
 import struct
 from ebustl_utils.models import JustificationCode, STLCaption, STLStyledSegment
-from ebustl_utils.helpers import format_timecode_from_seconds, decode_ebu_stl_text
+from ..helpers import format_timecode_from_seconds, decode_ebu_stl_text
 
 
 # ------------------------------------------------------------------ #

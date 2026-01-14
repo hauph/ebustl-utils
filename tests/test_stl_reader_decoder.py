@@ -2,7 +2,7 @@ import warnings
 
 import pytest
 from ebustl_utils.STLReader.decoder import decode_stl_file
-from ebustl_utils.STLReader.STLValidationWarning import STLValidationWarning
+from ebustl_utils.STLReader import STLValidationWarning
 
 from helpers_for_testing import make_gsi_block, make_stl_file, make_tti_block
 

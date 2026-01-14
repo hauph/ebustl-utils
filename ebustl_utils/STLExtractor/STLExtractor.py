@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from typing import Optional
 
-from ebustl_utils.helpers import convert_teletext_to_stl
+from .helpers import convert_teletext_to_stl
 from ebustl_utils.models import VideoInfo
 
 

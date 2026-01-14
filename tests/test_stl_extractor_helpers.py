@@ -1,9 +1,7 @@
-from ebustl_utils.helpers import (
+from ebustl_utils.STLExtractor.helpers import (
     extract_teletext_from_vanc,
     TeletextParser,
     EBUSTLWriter,
-    format_timecode_from_seconds,
-    decode_ebu_stl_text,
     _format_tc,
 )
 from ebustl_utils.models import (
@@ -12,7 +10,6 @@ from ebustl_utils.models import (
     TextSegment,
     TeletextColor,
     JustificationCode,
-    EBUSTLControlCode,
 )
 
 from helpers_for_testing import TELETEXT_SYNC
@@ -80,46 +77,6 @@ class TestExtractTeletextFromVanc:
 
 
 # =============================================================================
-# Tests for format_timecode_from_seconds
-# =============================================================================
-
-
-class TestFormatTimecodeFromSeconds:
-    """Tests for timecode formatting utility."""
-
-    def test_zero_seconds(self):
-        """Format 0 seconds."""
-        result = format_timecode_from_seconds(0, 25)
-        assert result == "00:00:00;00"
-
-    def test_simple_seconds(self):
-        """Format simple seconds value."""
-        result = format_timecode_from_seconds(5, 25)
-        assert result == "00:00:05;00"
-
-    def test_with_frames(self):
-        """Format seconds with fractional frames."""
-        # 5.5 seconds at 25fps = 5 seconds + 12.5 frames (rounds to 13)
-        result = format_timecode_from_seconds(5.52, 25)
-        assert result == "00:00:05;13"
-
-    def test_minutes(self):
-        """Format minutes value."""
-        result = format_timecode_from_seconds(125, 25)  # 2:05
-        assert result == "00:02:05;00"
-
-    def test_hours(self):
-        """Format hours value."""
-        result = format_timecode_from_seconds(3661, 25)  # 1:01:01
-        assert result == "01:01:01;00"
-
-    def test_negative_clamps_to_zero(self):
-        """Negative seconds should clamp to zero."""
-        result = format_timecode_from_seconds(-5, 25)
-        assert result == "00:00:00;00"
-
-
-# =============================================================================
 # Tests for _format_tc (internal frame formatter)
 # =============================================================================
 
@@ -148,119 +105,6 @@ class TestFormatTc:
         frames = (1 * 3600 + 2 * 60 + 3) * 25 + 10
         result = _format_tc(frames, 25)
         assert result == "01:02:03:10"
-
-
-# =============================================================================
-# Tests for decode_ebu_stl_text
-# =============================================================================
-
-# TTI text field is 112 bytes
-TTI_TEXT_FIELD_SIZE = 112
-
-
-def make_tti_text(*parts: bytes) -> bytes:
-    """Create a 112-byte TTI text field from parts, padded with unused space."""
-    content = b"".join(parts)
-    padding_size = TTI_TEXT_FIELD_SIZE - len(content)
-    return content + bytes([EBUSTLControlCode.UNUSED_SPACE] * padding_size)
-
-
-class TestDecodeEbuStlText:
-    """Tests for TTI text field decoding."""
-
-    def test_simple_text(self):
-        """Decode simple ASCII text."""
-        text_raw = make_tti_text(b"Hello")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Hello"
-        assert result["italic"] is False
-        assert result["bold"] is False
-
-    def test_italic_text(self):
-        """Decode italic formatted text."""
-        # Note: decode_ebu_stl_text tracks final state, so omit ITALIC_OFF
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.ITALIC_ON]), b"Italic")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Italic"
-        assert result["italic"] is True
-
-    def test_underline_text(self):
-        """Decode underlined text."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.UNDERLINE_ON]), b"Underline")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Underline"
-        assert result["underline"] is True
-
-    def test_double_height(self):
-        """Decode double height text."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.DOUBLE_HEIGHT]), b"Big")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Big"
-        assert result["double_height"] is True
-
-    def test_flash_text(self):
-        """Decode flashing text."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.FLASH]), b"Flash")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Flash"
-        assert result["flash"] is True
-
-    def test_color_code(self):
-        """Decode text with color code."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.ALPHA_RED]), b"Red")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Red"
-        assert result["color"] == "red"
-
-    def test_white_color_returns_none(self):
-        """White color (default) returns None."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.ALPHA_WHITE]), b"White")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "White"
-        assert result["color"] is None
-
-    def test_start_box_sets_background(self):
-        """Start box control code sets background color."""
-        text_raw = make_tti_text(bytes([EBUSTLControlCode.START_BOX]), b"Boxed")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Boxed"
-        assert result["background_color"] == "black"
-
-    def test_newline_handling(self):
-        """Decode text with newlines."""
-        text_raw = make_tti_text(b"Line1", bytes([EBUSTLControlCode.NEWLINE]), b"Line2")
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Line1\nLine2"
-
-    def test_consecutive_newlines_collapsed(self):
-        """Consecutive newlines should be collapsed."""
-        text_raw = make_tti_text(
-            b"Line1",
-            bytes([EBUSTLControlCode.NEWLINE, EBUSTLControlCode.NEWLINE]),
-            b"Line2",
-        )
-
-        result = decode_ebu_stl_text(text_raw)
-
-        assert result["text"] == "Line1\nLine2"
 
 
 # =============================================================================
@@ -398,78 +242,3 @@ class TestTeletextParser:
         result = parser._detect_justification(lines)
 
         assert result == JustificationCode.CENTERED
-
-
-# =============================================================================
-# Tests for SubtitleLine and TextSegment models
-# =============================================================================
-
-
-class TestSubtitleLine:
-    """Tests for SubtitleLine model."""
-
-    def test_text_property(self):
-        """Get concatenated text from segments."""
-        line = SubtitleLine(
-            row=20,
-            segments=[
-                TextSegment(text="Hello "),
-                TextSegment(text="World"),
-            ],
-        )
-
-        assert line.text == "Hello World"
-
-    def test_has_content_true(self):
-        """has_content returns True for non-empty text."""
-        line = SubtitleLine(
-            row=20,
-            segments=[TextSegment(text="Content")],
-        )
-
-        assert line.has_content is True
-
-    def test_has_content_false_empty(self):
-        """has_content returns False for empty line."""
-        line = SubtitleLine(row=20, segments=[])
-
-        assert line.has_content is False
-
-    def test_has_content_false_whitespace(self):
-        """has_content returns False for whitespace-only."""
-        line = SubtitleLine(
-            row=20,
-            segments=[TextSegment(text="   ")],
-        )
-
-        assert line.has_content is False
-
-
-class TestSubtitle:
-    """Tests for Subtitle model."""
-
-    def test_has_content_true(self):
-        """has_content returns True when lines have content."""
-        subtitle = Subtitle(
-            index=1,
-            start_time=0,
-            end_time=75,
-            lines=[
-                SubtitleLine(row=20, segments=[TextSegment(text="Content")]),
-            ],
-        )
-
-        assert subtitle.has_content is True
-
-    def test_has_content_false(self):
-        """has_content returns False when no lines have content."""
-        subtitle = Subtitle(
-            index=1,
-            start_time=0,
-            end_time=75,
-            lines=[
-                SubtitleLine(row=20, segments=[]),
-            ],
-        )
-
-        assert subtitle.has_content is False
