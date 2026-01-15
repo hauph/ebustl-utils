@@ -4,12 +4,12 @@ A Python library for working with EBU STL (European Broadcasting Union Subtitlin
 
 ## Preface
 
-Once, I worked on a project that required me to extract teletext subtitles from MXF video files and parse them into EBU STL format. Also, I needed to parse the EBU STL file and get the caption data with timing and formatting. I found that there were no libraries that could do this (maybe I just didn't look hard enough), so I decided to create my own.
+Once, I worked on a project that required me to extract teletext subtitles from MXF video files and parse them into EBU STL format. Also, I needed to parse the EBU STL file and get the caption data with timing and formatting. I found that there were no libraries that could do this (maybe I just didn't look hard enough), so I decided to vibe-code my own.
 
 In this library, there are two main classes: `STLExtractor` and `STLReader`.
 
-- `STLExtractor` is used to extract teletext subtitles from MXF video files (.mxf) and convert them to EBU STL format. It depends on `ffmpeg` and `ffprobe` to extract the teletext subtitles from the MXF video file. The tricky part is to decode the teletext packets; and fortunately, there is a library that supports this called [teletext-decoder](https://github.com/ZXGuesser/teletext-decoder) that I used in this library.
-- `STLReader` is used to read and parse EBU STL (.stl) binary files into structured caption data. The caption data structure is inspired by [Pycaption library](https://github.com/pbs/pycaption), though there are some differences. Besides, I tried to follow the EBU Tech 3264-E specification as much as possible + I used Adobe Premiere as a reference for the caption data such as styling, layout information and validation warnings/errors.
+- `STLExtractor` is used to extract teletext subtitles from MXF video files (.mxf) and convert them to EBU STL format. Requires `ffmpeg` and `ffprobe` for raw data extraction. Includes a minimal teletext packet decoder inspired by `teletext-decoder` and follows the `ETSI EN 300 706 V1.2.1 - Enhanced Teletext specification`.
+- `STLReader` is used to read and parse EBU STL (.stl) binary files into structured caption data. The caption data structure is inspired by `Pycaption` library, though there are some differences. Besides, I tried to follow the EBU Tech 3264-E specification as much as possible + I used Adobe Premiere as a reference for the caption data such as styling, layout information and validation warnings/errors.
 
 ## Features
 
@@ -272,9 +272,11 @@ MIT License — see [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 - [EBU Tech 3264-E](https://tech.ebu.ch/docs/tech/tech3264.pdf) — EBU Subtitling Data Exchange Format specification.
+- [ETSI EN 300 706 V1.2.1 - Enhanced Teletext specification](https://www.etsi.org/deliver/etsi_en/300700_300799/300706/01.02.01_60/en_300706v010201p.pdf) — The European standard for Enhanced Teletext (E-TET) specification.
+- [ffmpeg](https://www.ffmpeg.org/) — A complete, cross-platform solution to record, convert and stream audio and video.
 - [teletext-decoder](https://github.com/ZXGuesser/teletext-decoder) — Teletext packet decoding.
-- [stltools](https://github.com/blutorange/stltools) — Ebu Stl Subtitle Writer, written in Ruby.
 - [pycaption](https://github.com/pbs/pycaption) — Python module to read/write popular video caption formats.
+- [stltools](https://github.com/blutorange/stltools) — Ebu Stl Subtitle Writer, written in Ruby.
 
 ## Postface
 

@@ -23,7 +23,7 @@ class STLExtractor:
     ):
         if mxf_path is None:
             raise ValueError("MXF path is required")
-        elif not mxf_path.endswith(".mxf"):
+        elif not mxf_path.lower().endswith(".mxf"):
             raise ValueError("MXF path must end with .mxf")
 
         if output_dir is None:

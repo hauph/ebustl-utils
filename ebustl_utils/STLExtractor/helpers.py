@@ -6,8 +6,6 @@ EBU STL Helpers - STLExtractor
     - Layout (positioning, justification)
     - Formatting (italic, underline, boxing, double height)
     - Character set mappings
-
-    Uses decode_teletext_line function from teletext-decoder library for teletext parsing.
 """
 
 import struct
@@ -15,7 +13,7 @@ from datetime import datetime
 from typing import List, Dict
 import re
 
-from teletextdecoder.decoder import decode_teletext_line
+from .decoder import decode_teletext_line
 
 from ebustl_utils.models import (
     TeletextColor,
@@ -178,7 +176,6 @@ class TeletextParser:
 
     def _process_packet(self, packet: bytes) -> None:
         """Process a teletext packet and extract formatting."""
-        # Use teletextdecoder for basic packet decoding
         decoded = decode_teletext_line(packet)
 
         if not decoded or len(decoded) < 2:
