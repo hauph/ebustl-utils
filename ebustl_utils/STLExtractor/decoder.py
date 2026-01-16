@@ -13,6 +13,26 @@ References:
 
 from typing import List, Tuple, Union
 
+# Teletext G0 character mapping for pound sign.
+# In teletext, byte position 0x23 displays as £ (pound sign) instead of # (hash).
+# Other characters remain as standard ASCII.
+TELETEXT_CHAR_MAP = {
+    0x23: "£",  # Pound sign (ASCII position has #)
+}
+
+
+def teletext_byte_to_char(byte: int) -> str:
+    """
+    Convert a teletext byte to the correct Unicode character.
+
+    Applies teletext character mapping where byte 0x23 displays as £ (pound sign).
+    All other characters use standard ASCII interpretation.
+    """
+    if byte in TELETEXT_CHAR_MAP:
+        return TELETEXT_CHAR_MAP[byte]
+    return chr(byte)
+
+
 # Pre-computed Hamming 8/4 lookup table.
 # Index: input byte (0-255)
 # Value: (decoded_nibble, error_count)
@@ -370,13 +390,13 @@ def decode_teletext_line(data: bytes) -> List[Union[int, str, Tuple[int, int]]]:
                 # Control code - represent as hex in brackets
                 header += f"⟦{char_byte:02X}⟧"
             else:
-                header += chr(char_byte)
+                header += teletext_byte_to_char(char_byte)
 
         decoded_data.append(header)
 
     elif packet < 26:
         # Page row packets (1-25)
-        # Subtitle pages always use standard text coding
+        # Apply teletext character mapping (0x23 → £)
         text = ""
         for i in range(2, 42):
             char_byte = data[i] & 0x7F  # Strip parity bit
@@ -384,7 +404,7 @@ def decode_teletext_line(data: bytes) -> List[Union[int, str, Tuple[int, int]]]:
                 # Control code
                 text += f"⟦{char_byte:02X}⟧"
             else:
-                text += chr(char_byte)
+                text += teletext_byte_to_char(char_byte)
         decoded_data.append(text)
 
     # Packets 26-31 are not needed for subtitle extraction

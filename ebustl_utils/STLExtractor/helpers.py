@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List, Dict
 import re
 
-from .decoder import decode_teletext_line
+from .decoder import decode_teletext_line, teletext_byte_to_char
 
 from ebustl_utils.models import (
     TeletextColor,
@@ -231,35 +231,102 @@ class TeletextParser:
         Parse already-decoded teletext text string.
 
         The decoder returns text with control codes as ⟦XX⟧ sequences.
-        We need to extract the actual text and formatting.
-        """
-        line = SubtitleLine(row=row)
+        We need to extract the actual text and formatting including colors.
 
-        # Extract formatting from control codes in the text
+        Teletext control codes (0x00-0x1F):
+        - 0x00-0x07: Alpha colors (foreground) - BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
+        - 0x08: Flash
+        - 0x09: Steady (flash off)
+        - 0x0A: End Box
+        - 0x0B: Start Box
+        - 0x0C: Normal Height
+        - 0x0D: Double Height
+        - 0x10-0x17: Mosaic colors (treated as foreground for subtitles)
+        - 0x1C: Black Background
+        - 0x1D: New Background (set background to current foreground)
+        """
+        # Pattern to match control codes: ⟦XX⟧
+        control_pattern = re.compile(r"⟦([0-9A-Fa-f]{2})⟧")
+
+        # Detect justification from original text BEFORE stripping
+        # Remove control codes to get raw text with original whitespace
+        raw_text = re.sub(r"⟦[0-9A-Fa-f]{2}⟧", "", text)
+        justification = self._detect_line_justification(raw_text)
+
+        line = SubtitleLine(row=row, justification=justification)
+
+        # Current formatting state
+        fg_color = TeletextColor.WHITE
+        bg_color = TeletextColor.BLACK
         double_height = False
+        flash = False
         boxing = False
 
-        # Check for control codes
-        if "⟦0D⟧" in text:  # Double height
-            double_height = True
-            line.double_height = True
-        if "⟦0B⟧" in text:  # Start box
-            boxing = True
+        current_text = ""
+        pos = 0
 
-        # Remove all control code sequences ⟦XX⟧
-        clean_text = re.sub(r"⟦[0-9A-Fa-f]{2}⟧", "", text)
+        while pos < len(text):
+            # Check for control code at current position
+            match = control_pattern.match(text, pos)
 
-        # Strip whitespace
-        clean_text = clean_text.strip()
+            if match:
+                code = int(match.group(1), 16)
 
-        if clean_text:
+                # Save current segment before applying new formatting
+                if current_text:
+                    line.segments.append(
+                        TextSegment(
+                            text=current_text,
+                            foreground_color=fg_color,
+                            background_color=bg_color,
+                            double_height=double_height,
+                            flash=flash,
+                            boxing=boxing,
+                            concealed=False,
+                        )
+                    )
+                    current_text = ""
+
+                # Process control code
+                if code <= 0x07:
+                    # Alpha foreground color (0x00-0x07)
+                    fg_color = TeletextColor(code)
+                elif code >= 0x10 and code <= 0x17:
+                    # Mosaic color (treat as foreground for subtitles)
+                    fg_color = TeletextColor(code - 0x10)
+                elif code == 0x08:  # Flash
+                    flash = True
+                elif code == 0x09:  # Steady
+                    flash = False
+                elif code == 0x0B:  # Start Box
+                    boxing = True
+                elif code == 0x0A:  # End Box
+                    boxing = False
+                elif code == 0x0D:  # Double Height
+                    double_height = True
+                    line.double_height = True
+                elif code == 0x0C:  # Normal Height
+                    double_height = False
+                elif code == 0x1C:  # Black Background
+                    bg_color = TeletextColor.BLACK
+                elif code == 0x1D:  # New Background
+                    bg_color = fg_color
+
+                pos = match.end()
+            else:
+                # Regular character
+                current_text += text[pos]
+                pos += 1
+
+        # Save final segment
+        if current_text.strip():
             line.segments.append(
                 TextSegment(
-                    text=clean_text,
-                    foreground_color=TeletextColor.WHITE,
-                    background_color=TeletextColor.BLACK,
+                    text=current_text.strip(),
+                    foreground_color=fg_color,
+                    background_color=bg_color,
                     double_height=double_height,
-                    flash=False,
+                    flash=flash,
                     boxing=boxing,
                     concealed=False,
                 )
@@ -343,7 +410,8 @@ class TeletextParser:
                 current_text += " "
             else:
                 # Regular printable character (0x21-0x7F)
-                current_text += chr(byte)
+                # Apply teletext mapping (0x23 → £)
+                current_text += teletext_byte_to_char(byte)
 
         # Save final segment
         if current_text:
@@ -409,28 +477,45 @@ class TeletextParser:
 
         self.current_rows[magazine] = {}
 
+    def _detect_line_justification(self, raw_text: str) -> JustificationCode:
+        """
+        Detect justification from a single line's raw text with original whitespace.
+
+        Args:
+            raw_text: Text with control codes removed but whitespace preserved
+
+        Returns:
+            Detected justification code
+        """
+        stripped = raw_text.strip()
+        if not stripped:
+            return JustificationCode.CENTERED
+
+        left_spaces = len(raw_text) - len(raw_text.lstrip())
+        right_spaces = len(raw_text) - len(raw_text.rstrip())
+
+        # If roughly balanced (within 3 chars), consider it centered
+        if abs(left_spaces - right_spaces) <= 3:
+            return JustificationCode.CENTERED
+        elif left_spaces > right_spaces:
+            # More space on left = text pushed to right = right justified
+            return JustificationCode.RIGHT
+        else:
+            # More space on right = text pushed to left = left justified
+            return JustificationCode.LEFT
+
     def _detect_justification(self, lines: List[SubtitleLine]) -> JustificationCode:
-        """Detect text justification from content alignment."""
+        """
+        Return justification for subtitle based on line justifications.
+
+        Uses the justification detected during parsing (from original whitespace).
+        Falls back to CENTERED if no justification was detected.
+        """
         for line in lines:
-            if not line.has_content:
-                continue
+            if line.has_content and line.justification is not None:
+                return line.justification
 
-            text = line.text
-            stripped = text.strip()
-            if not stripped:
-                continue
-
-            left_spaces = len(text) - len(text.lstrip())
-            right_spaces = len(text) - len(text.rstrip())
-
-            # If roughly centered
-            if abs(left_spaces - right_spaces) <= 3:
-                return JustificationCode.CENTERED
-            elif left_spaces < right_spaces:
-                return JustificationCode.LEFT
-            else:
-                return JustificationCode.RIGHT
-
+        # Default to centered if no justification detected
         return JustificationCode.CENTERED
 
     def _calculate_end_times(self) -> None:
@@ -662,37 +747,36 @@ class EBUSTLWriter:
 
     def _encode_text_with_formatting(self, subtitle: Subtitle) -> bytes:
         """
-        Encode subtitle text for EBU STL format.
+        Encode subtitle text for EBU STL format with full formatting.
 
-        Produces clean text with:
+        Produces text with:
+        - Foreground color codes (0x00-0x07)
+        - Background color codes (0x1C for black, 0x1D for new background)
         - Start Box codes for closed captions
         - Double Height for teletext display
+        - Flash codes
         - Line breaks between lines
         - Clean stripped text (no leading/trailing spaces)
         """
         result = bytearray()
 
-        # Collect all non-empty lines with stripped text
+        # Collect all non-empty lines with their segments
         text_lines = []
         for line in subtitle.lines:
-            # Get clean text: strip each segment and join
-            line_text = ""
+            line_segments = []
             for segment in line.segments:
-                if not segment.concealed:
-                    line_text += segment.text
-
-            # Strip the whole line
-            stripped = line_text.strip()
-            if stripped:
-                text_lines.append((stripped, line.double_height))
+                if not segment.concealed and segment.text.strip():
+                    line_segments.append(segment)
+            if line_segments:
+                text_lines.append((line_segments, line.double_height))
 
         if not text_lines:
             return bytes()
 
-        # Add text lines with proper control codes for each line
+        # Check if any line has double height
         has_double_height = any(dh for _, dh in text_lines)
 
-        for i, (text, _) in enumerate(text_lines):
+        for i, (segments, line_double_height) in enumerate(text_lines):
             if i > 0:
                 # Between lines: End Box (0x0A 0x0A) + CR/LF (0x8A 0x8A)
                 result.append(0x0A)  # End Box
@@ -706,37 +790,36 @@ class EBUSTLWriter:
             result.append(0x0B)  # Start Box
             result.append(0x0B)  # Start Box
 
-            # Encode text as latin-1 with UK teletext character mapping
-            # UK Teletext G0 National Option Subset differs from ASCII at these positions
-            UK_TELETEXT_TO_LATIN1 = {
-                "#": 0xA3,  # 0x23 → £ (pound sterling)
-                "[": 0x2190,  # 0x5B → ← (left arrow) - no Latin-1, keep as [
-                "\\": 0xBD,  # 0x5C → ½ (one-half)
-                "]": 0x2192,  # 0x5D → → (right arrow) - no Latin-1, keep as ]
-                "^": 0x2191,  # 0x5E → ↑ (up arrow) - no Latin-1, keep as ^
-                "_": 0x23,  # 0x5F → # (number sign)
-                "`": 0x2D,  # 0x60 → - (dash)
-                "{": 0xBC,  # 0x7B → ¼ (one-quarter)
-                "|": 0x7C,  # 0x7C → ‖ (double vertical line) - keep as |
-                "}": 0xBE,  # 0x7D → ¾ (three-quarters)
-                "~": 0xF7,  # 0x7E → ÷ (division sign)
-            }
+            # Track current formatting state to avoid redundant codes
+            current_fg_color = TeletextColor.WHITE
+            current_flash = False
 
-            for char in text:
-                if char in UK_TELETEXT_TO_LATIN1:
-                    mapped = UK_TELETEXT_TO_LATIN1[char]
-                    if mapped <= 0xFF:  # Only use if it fits in Latin-1
-                        result.append(mapped)
-                    else:
-                        result.append(ord(char))  # Keep original for non-Latin-1
-                else:
+            # Encode each segment with its formatting
+            for segment in segments:
+                # Add foreground color code if different from current
+                if segment.foreground_color != current_fg_color:
+                    result.append(int(segment.foreground_color))  # 0x00-0x07
+                    current_fg_color = segment.foreground_color
+
+                # Add flash code if needed
+                if segment.flash and not current_flash:
+                    result.append(0x08)  # Flash
+                    current_flash = True
+                elif not segment.flash and current_flash:
+                    result.append(0x09)  # Steady
+                    current_flash = False
+
+                # Encode text as standard Latin-1 (ISO 8859-1)
+                # The decoder already converted teletext bytes to correct Unicode characters,
+                # so we just need to encode them as Latin-1 for the STL file.
+                for char in segment.text:
                     try:
                         encoded = char.encode("latin-1")
                         result.append(encoded[0])
                     except (UnicodeEncodeError, ValueError):
-                        result.append(0x20)  # Space for unencodable
+                        result.append(0x20)  # Space for unencodable characters
 
-        # Add trailing End Box + newlines
+        # Add trailing End Box
         result.append(0x0A)  # End Box
         result.append(0x0A)  # End Box
 

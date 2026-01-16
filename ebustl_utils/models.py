@@ -172,6 +172,9 @@ class SubtitleLine:
     row: int  # Vertical position (1-24 for teletext)
     segments: List[TextSegment] = field(default_factory=list)
     double_height: bool = False
+    justification: Optional["JustificationCode"] = (
+        None  # Detected from original whitespace
+    )
 
     @property
     def text(self) -> str:

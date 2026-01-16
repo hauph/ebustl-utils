@@ -206,33 +206,37 @@ class TestTeletextParser:
 
         assert result == JustificationCode.CENTERED
 
-    def test_detect_justification_left(self):
-        """Detect left-aligned text justification."""
+    def test_detect_justification_uses_stored_value(self):
+        """Justification returns the stored value from line if set."""
         parser = TeletextParser()
         lines = [
             SubtitleLine(
                 row=20,
-                segments=[TextSegment(text="left text          ")],
+                segments=[TextSegment(text="some text")],
+                justification=JustificationCode.LEFT,
             )
         ]
 
         result = parser._detect_justification(lines)
 
+        # Returns the stored justification from the line
         assert result == JustificationCode.LEFT
 
-    def test_detect_justification_right(self):
-        """Detect right-aligned text justification."""
+    def test_detect_justification_defaults_to_centered(self):
+        """Justification defaults to centered when not set on line."""
         parser = TeletextParser()
         lines = [
             SubtitleLine(
                 row=20,
-                segments=[TextSegment(text="          right text")],
+                segments=[TextSegment(text="some text")],
+                justification=None,  # Not set
             )
         ]
 
         result = parser._detect_justification(lines)
 
-        assert result == JustificationCode.RIGHT
+        # Defaults to centered when justification is not set
+        assert result == JustificationCode.CENTERED
 
     def test_detect_justification_empty_lines(self):
         """Empty lines default to centered."""

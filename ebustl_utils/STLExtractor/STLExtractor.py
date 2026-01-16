@@ -23,7 +23,11 @@ class STLExtractor:
     ):
         if mxf_path is None:
             raise ValueError("MXF path is required")
-        elif not mxf_path.lower().endswith(".mxf"):
+
+        mxf_basename = os.path.basename(mxf_path)
+        file_name, extension = os.path.splitext(mxf_basename)
+
+        if extension.lower() != ".mxf":
             raise ValueError("MXF path must end with .mxf")
 
         if output_dir is None:
@@ -33,8 +37,7 @@ class STLExtractor:
         os.makedirs(output_dir, exist_ok=True)
 
         # Derive STL filename from MXF filename
-        mxf_basename = os.path.basename(mxf_path)
-        stl_filename = os.path.splitext(mxf_basename)[0] + ".stl"
+        stl_filename = file_name + ".stl"
 
         self.mxf_path = mxf_path
         self.output_dir = output_dir
