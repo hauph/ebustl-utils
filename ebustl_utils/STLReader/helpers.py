@@ -113,9 +113,14 @@ def decode_ebu_stl_text(text_raw: bytes, cct: str = "00") -> Dict[str, Any]:
         if byte == EBUSTLControlCode.UNUSED_SPACE:
             continue
         # Foreground colors (0x00-0x07)
+        # These are "spacing attributes" in teletext - they occupy a character cell
+        # position that displays as a space. Add space if there was preceding text.
         if EBUSTLControlCode.ALPHA_BLACK <= byte <= EBUSTLControlCode.ALPHA_WHITE:
             new_color = TELETEXT_COLOR_NAMES.get(byte, current_color)
             if new_color != current_color:
+                # Add space for the control code position if there was preceding text
+                if current_segment_text and not current_segment_text[-1].endswith(' '):
+                    current_segment_text.append(' ')
                 flush_segment()
                 current_color = new_color
             continue
